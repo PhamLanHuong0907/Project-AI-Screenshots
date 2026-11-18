@@ -213,6 +213,7 @@ export interface AppSettings {
   claudeCliPath: string
   autoApplyRename: boolean
   organizeMode: OrganizeMode
+  deleteSourceOnConfirm: boolean
   watchClipboard: boolean
   maxImageSizeMB: number
   autoMonitorOnStartup: boolean
@@ -236,6 +237,7 @@ export interface UpdateSettingsPayload {
   useClaudeCodeCli?: boolean
   autoApplyRename?: boolean
   organizeMode?: OrganizeMode
+  deleteSourceOnConfirm?: boolean
   watchClipboard?: boolean
   openaiApiKey?: string
   geminiApiKey?: string

@@ -946,11 +946,17 @@ Then output ONLY a JSON object with keys: "suggestedName", "category", "descript
     const baseUrl = (settings.ollamaBaseUrl || 'http://127.0.0.1:11434').replace(/\/+$/, '')
     const endpoint = `${baseUrl}/api/generate`
 
-    const imageDataUrl = await this.imageService.prepareImageForAI(filePath)
+    const imageDataUrl = await this.imageService.prepareImageForAI(filePath, 1024, true)
     const { base64Data } = this.splitDataUrl(imageDataUrl)
 
-    const promptText = `${SYSTEM_INSTRUCTIONS}
-Analyze this screenshot and respond ONLY with a valid JSON object containing keys: "suggestedName", "category", "description", "tags", and "confidence". Do not wrap in markdown or conversational text.`
+    const promptText = `Analyze this screenshot's overall visual scene, layout, and text. Respond ONLY with a valid JSON object:
+{
+  "suggestedName": "concise ASCII_with_underscores filename summarizing the main content/context (max 60 chars, no extension, NO menu words like File/Edit/Selection, NEVER guess Excel unless a spreadsheet grid is visible)",
+  "category": "fitting Parent/Subcategory (e.g. Programming/TypeScript, Data-Analytics/Excel, Finance/Banking, Shopping/Orders, Social/Chat, System/Settings, Education/Lecture, Office/Documents, Design/UI-UX, Others)",
+  "description": "1-2 clear sentences in Vietnamese summarizing what the image is about and its visual context",
+  "tags": ["3 to 6 relevant keywords"],
+  "confidence": 0.9
+}`
 
     try {
       const response = await fetch(endpoint, {
@@ -962,11 +968,13 @@ Analyze this screenshot and respond ONLY with a valid JSON object containing key
           images: [base64Data],
           stream: false,
           format: 'json',
+          keep_alive: '30m',
           options: {
-            temperature: 0.1
+            temperature: 0.1,
+            num_predict: 220
           }
         }),
-        signal: AbortSignal.timeout(60000)
+        signal: AbortSignal.timeout(180000)
       })
 
       if (!response.ok) {

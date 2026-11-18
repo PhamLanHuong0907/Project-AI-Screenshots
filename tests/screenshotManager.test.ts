@@ -437,7 +437,8 @@ describe('AI Screenshot Manager - Critical Test Suite', () => {
         aiProvider: 'claude',
         aiModel: 'sonnet',
         autoApplyRename: true,
-        organizeMode: 'rename_in_place'
+        organizeMode: 'rename_in_place',
+        deleteSourceOnConfirm: false
       })
       expect(updated.aiProvider).toBe('claude')
       expect(updated.aiModel).toBe('sonnet')
@@ -557,6 +558,72 @@ describe('AI Screenshot Manager - Critical Test Suite', () => {
       expect(schoolResult.suggestedName).not.toMatch(/Nen_Bps_Long_Dua/i)
       expect(schoolResult.description).toContain('Đoàn trường THPT Sông Công')
       expect(schoolResult.description).toContain('có hình ảnh/đồ họa màu sắc minh họa')
+    })
+
+    it('supports deleteSourceOnConfirm setting to remove original from Screenshots or keep it', async () => {
+      const sourceDir = path.join(tempDir, 'ScreenshotsSrc')
+      const destDir = path.join(tempDir, 'OrganizedDest')
+      const configDir = path.join(tempDir, 'config-del-src')
+      fs.mkdirSync(sourceDir, { recursive: true })
+      fs.mkdirSync(path.join(destDir, 'Tuần 1'), { recursive: true })
+
+      const settingsService = new SettingsService(configDir)
+      const fileOrganizer = new FileOrganizer(repository, settingsService)
+
+      // 1. deleteSourceOnConfirm = true (default): removes original from Screenshots even if organizeMode is rename_in_place
+      settingsService.updateSettings({
+        sourceFolder: sourceDir,
+        destinationFolder: destDir,
+        organizeMode: 'rename_in_place',
+        deleteSourceOnConfirm: true
+      })
+
+      const srcFile1 = path.join(sourceDir, 'Screenshot_100.png')
+      fs.writeFileSync(srcFile1, SAMPLE_PNG_BUFFER)
+      const rec1 = repository.create({
+        original_name: 'Screenshot_100.png',
+        original_path: srcFile1,
+        file_hash: computeBufferSha256(SAMPLE_PNG_BUFFER),
+        status: 'review'
+      })
+
+      const saved1 = await fileOrganizer.confirmAndOrganize({
+        id: rec1.id,
+        finalName: 'Bai_Tap_Tuan_1',
+        category: 'Tuần 1',
+        description: 'Bài tập tuần 1',
+        tags: ['Study']
+      })
+
+      expect(fs.existsSync(srcFile1)).toBe(false)
+      expect(fs.existsSync(saved1.final_path)).toBe(true)
+      expect(saved1.final_path).toBe(path.join(destDir, 'Tuần 1', 'Bai_Tap_Tuan_1.png'))
+
+      // 2. deleteSourceOnConfirm = false with category_folders: keeps original in Screenshots
+      settingsService.updateSettings({
+        organizeMode: 'category_folders',
+        deleteSourceOnConfirm: false
+      })
+
+      const srcFile2 = path.join(sourceDir, 'Screenshot_101.png')
+      fs.writeFileSync(srcFile2, SAMPLE_PNG_BUFFER)
+      const rec2 = repository.create({
+        original_name: 'Screenshot_101.png',
+        original_path: srcFile2,
+        file_hash: computeBufferSha256(SAMPLE_PNG_BUFFER) + '_2',
+        status: 'review'
+      })
+
+      const saved2 = await fileOrganizer.confirmAndOrganize({
+        id: rec2.id,
+        finalName: 'Bai_Tap_Tuan_1_Copy',
+        category: 'Tuần 1',
+        description: 'Bài tập tuần 1 bản sao',
+        tags: ['Study']
+      })
+
+      expect(fs.existsSync(srcFile2)).toBe(true)
+      expect(fs.existsSync(saved2.final_path)).toBe(true)
     })
   })
 })

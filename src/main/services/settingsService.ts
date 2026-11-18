@@ -21,6 +21,7 @@ interface StoredSettingsData {
   useClaudeCodeCli: boolean
   autoApplyRename: boolean
   organizeMode: OrganizeMode
+  deleteSourceOnConfirm?: boolean
   watchClipboard: boolean
   maxImageSizeMB: number
   autoMonitorOnStartup: boolean
@@ -106,6 +107,7 @@ export class SettingsService {
       useClaudeCodeCli: true,
       autoApplyRename: false,
       organizeMode: 'rename_in_place',
+      deleteSourceOnConfirm: true,
       watchClipboard: true,
       maxImageSizeMB: 20,
       autoMonitorOnStartup: true,
@@ -202,6 +204,7 @@ export class SettingsService {
       claudeCliPath: this.detectedClaudeCliPath,
       autoApplyRename: Boolean(this.data.autoApplyRename),
       organizeMode: this.data.organizeMode || 'rename_in_place',
+      deleteSourceOnConfirm: this.data.deleteSourceOnConfirm !== false,
       watchClipboard: Boolean(this.data.watchClipboard),
       maxImageSizeMB: this.data.maxImageSizeMB,
       autoMonitorOnStartup: this.data.autoMonitorOnStartup,
@@ -340,6 +343,9 @@ export class SettingsService {
     }
     if (payload.organizeMode !== undefined) {
       this.data.organizeMode = payload.organizeMode
+    }
+    if (payload.deleteSourceOnConfirm !== undefined) {
+      this.data.deleteSourceOnConfirm = Boolean(payload.deleteSourceOnConfirm)
     }
     if (payload.watchClipboard !== undefined) {
       this.data.watchClipboard = Boolean(payload.watchClipboard)

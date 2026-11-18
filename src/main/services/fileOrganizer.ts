@@ -70,10 +70,11 @@ export class FileOrganizer {
 
     const settings = this.settingsService.getPublicSettings()
     const mode: OrganizeMode = modeOverride || settings.organizeMode || 'category_folders'
+    const deleteSource = settings.deleteSourceOnConfirm !== false && modeOverride !== 'rename_in_place'
 
     let targetDir: string
     let finalCategoryName = validated.category.trim()
-    if (mode === 'rename_in_place') {
+    if (!deleteSource && mode === 'rename_in_place') {
       targetDir = path.dirname(path.resolve(sourcePath))
       finalCategoryName = path.basename(targetDir)
     } else {
@@ -99,7 +100,11 @@ export class FileOrganizer {
     } else {
       uniqueDestPath = generateUniqueFilePath(targetDir, cleanBaseName, originalExt)
       this.watcher?.markPathInFlight?.(uniqueDestPath)
-      await safeMoveFile(sourcePath, uniqueDestPath)
+      if (deleteSource || mode === 'rename_in_place') {
+        await safeMoveFile(sourcePath, uniqueDestPath)
+      } else {
+        await fs.promises.copyFile(sourcePath, uniqueDestPath, fs.constants.COPYFILE_EXCL)
+      }
     }
 
     const finalFileName = path.basename(uniqueDestPath)

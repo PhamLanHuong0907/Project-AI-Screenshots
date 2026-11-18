@@ -76,29 +76,44 @@ export class ImageService {
   }
 
   /**
-   * Prepares an optimized Base64 Data URL (`data:image/...;base64,...`) suitable for OpenAI Vision input.
-   * Downscales images larger than 2048px on their longest edge while keeping text sharp.
+   * Prepares an optimized Base64 Data URL (`data:image/...;base64,...`) suitable for Vision AI input.
+   * Downscales images larger than `maxEdge` (default 2048px, or 1024px for fast local Ollama)
+   * and optionally encodes as compact JPEG to dramatically speed up local multimodal inference.
    */
-  public async prepareImageForAI(filePath: string): Promise<string> {
+  public async prepareImageForAI(
+    filePath: string,
+    maxEdge = 2048,
+    preferJpeg = false
+  ): Promise<string> {
     const ext = path.extname(filePath).toLowerCase()
     const defaultMime = MIME_BY_EXT[ext] || 'image/png'
 
     try {
       const pipeline = sharp(filePath)
       const meta = await pipeline.metadata()
+      const needsResize =
+        (meta.width && meta.width > maxEdge) || (meta.height && meta.height > maxEdge)
 
-      if ((meta.width && meta.width > 2048) || (meta.height && meta.height > 2048)) {
-        const resizedBuffer = await pipeline
-          .resize({
-            width: 2048,
-            height: 2048,
-            fit: 'inside',
-            withoutEnlargement: true
-          })
-          .png({ quality: 90 })
-          .toBuffer()
+      if (needsResize || preferJpeg) {
+        const resized = needsResize
+          ? pipeline.resize({
+              width: maxEdge,
+              height: maxEdge,
+              fit: 'inside',
+              withoutEnlargement: true
+            })
+          : pipeline
 
-        return `data:image/png;base64,${resizedBuffer.toString('base64')}`
+        if (preferJpeg) {
+          const jpegBuffer = await resized
+            .flatten({ background: '#ffffff' })
+            .jpeg({ quality: 82, mozjpeg: true })
+            .toBuffer()
+          return `data:image/jpeg;base64,${jpegBuffer.toString('base64')}`
+        }
+
+        const pngBuffer = await resized.png({ quality: 90 }).toBuffer()
+        return `data:image/png;base64,${pngBuffer.toString('base64')}`
       }
     } catch {
       // Fallback to raw file buffer if resize fails

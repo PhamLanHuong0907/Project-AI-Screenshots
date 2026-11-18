@@ -55,6 +55,7 @@ export const Settings: React.FC<SettingsProps> = ({
 
   const [autoApplyRename, setAutoApplyRename] = useState(false)
   const [organizeMode, setOrganizeMode] = useState<OrganizeMode>('rename_in_place')
+  const [deleteSourceOnConfirm, setDeleteSourceOnConfirm] = useState(true)
   const [watchClipboard, setWatchClipboard] = useState(true)
 
   const [maxImageSizeMB, setMaxImageSizeMB] = useState(20)
@@ -82,6 +83,7 @@ export const Settings: React.FC<SettingsProps> = ({
     setUseClaudeCodeCli(settings.useClaudeCodeCli)
     setAutoApplyRename(settings.autoApplyRename)
     setOrganizeMode(settings.organizeMode || 'rename_in_place')
+    setDeleteSourceOnConfirm(settings.deleteSourceOnConfirm !== false)
     setWatchClipboard(settings.watchClipboard)
 
     const presetList = AI_PROVIDER_MODELS[prov] || []
@@ -157,6 +159,7 @@ export const Settings: React.FC<SettingsProps> = ({
         useClaudeCodeCli,
         autoApplyRename,
         organizeMode,
+        deleteSourceOnConfirm,
         watchClipboard,
         openaiApiKey: openaiKeyInput.trim() || undefined,
         geminiApiKey: geminiKeyInput.trim() || undefined,
@@ -623,6 +626,23 @@ export const Settings: React.FC<SettingsProps> = ({
               </p>
             </div>
           </div>
+
+          <label className="flex items-center gap-3 pt-1 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={deleteSourceOnConfirm}
+              onChange={(e) => setDeleteSourceOnConfirm(e.target.checked)}
+              className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+            />
+            <div>
+              <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                Xóa ảnh gốc trong thư mục Screenshots sau khi bấm Đổi tên (Chỉ lưu trong thư mục đã chọn)
+              </p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Khi bật: ảnh sau khi xác nhận đổi tên sẽ được chuyển hẳn vào thư mục đích đã chọn và xóa khỏi thư mục Screenshots gốc. Khi tắt: giữ lại ảnh trong Screenshots theo chế độ lưu ở trên.
+              </p>
+            </div>
+          </label>
 
           <label className="flex items-center gap-3 pt-1 cursor-pointer">
             <input
