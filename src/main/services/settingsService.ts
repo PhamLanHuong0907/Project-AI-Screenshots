@@ -18,6 +18,7 @@ interface StoredSettingsData {
   aiModel: string
   ollamaBaseUrl?: string
   customCategories?: string[]
+  useDefaultCategories?: boolean
   useClaudeCodeCli: boolean
   autoApplyRename: boolean
   organizeMode: OrganizeMode
@@ -104,6 +105,7 @@ export class SettingsService {
       aiModel: process.env.OPENAI_MODEL || 'gemini-4-argon',
       ollamaBaseUrl: process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434',
       customCategories: [],
+      useDefaultCategories: true,
       useClaudeCodeCli: true,
       autoApplyRename: false,
       organizeMode: 'rename_in_place',
@@ -199,6 +201,7 @@ export class SettingsService {
       aiModel: this.data.aiModel,
       ollamaBaseUrl: this.data.ollamaBaseUrl || 'http://127.0.0.1:11434',
       customCategories: this.data.customCategories || [],
+      useDefaultCategories: this.data.useDefaultCategories !== false,
       useClaudeCodeCli: Boolean(this.data.useClaudeCodeCli),
       claudeCliAvailable: Boolean(this.detectedClaudeCliPath),
       claudeCliPath: this.detectedClaudeCliPath,
@@ -334,6 +337,9 @@ export class SettingsService {
             .filter((c) => c.length > 0)
         )
       )
+    }
+    if (payload.useDefaultCategories !== undefined) {
+      this.data.useDefaultCategories = Boolean(payload.useDefaultCategories)
     }
     if (payload.useClaudeCodeCli !== undefined) {
       this.data.useClaudeCodeCli = Boolean(payload.useClaudeCodeCli)

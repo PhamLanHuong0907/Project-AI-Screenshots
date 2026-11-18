@@ -1,4 +1,5 @@
 import { execFile } from 'child_process'
+import fs from 'fs'
 import path from 'path'
 import { promisify } from 'util'
 import OpenAI from 'openai'
@@ -934,6 +935,32 @@ Then output ONLY a JSON object with keys: "suggestedName", "category", "descript
     }
   }
 
+  private getCustomFolderPromptHint(): string {
+    const settings = this.settingsService.getPublicSettings()
+    if (settings.useDefaultCategories !== false) {
+      return ''
+    }
+
+    const folders = new Set<string>(settings.customCategories || [])
+    const destDir = settings.destinationFolder
+    if (destDir && fs.existsSync(destDir)) {
+      try {
+        for (const entry of fs.readdirSync(destDir, { withFileTypes: true })) {
+          if (entry.isDirectory() && !entry.name.startsWith('.')) {
+            folders.add(entry.name)
+          }
+        }
+      } catch {
+        // Ignore
+      }
+    }
+
+    const list = Array.from(folders).slice(0, 30)
+    if (list.length === 0) return ''
+
+    return `\nIMPORTANT: Default categories are disabled. For "category", you MUST pick the single best matching folder from the user's existing folders: ${JSON.stringify(list)}.`
+  }
+
   /**
    * 5. Local Ollama Vision Implementation
    * Supports local multimodal models such as moondream, minicpm-v, and llama3.2-vision via Ollama REST API.
@@ -948,15 +975,16 @@ Then output ONLY a JSON object with keys: "suggestedName", "category", "descript
 
     const imageDataUrl = await this.imageService.prepareImageForAI(filePath, 1024, true)
     const { base64Data } = this.splitDataUrl(imageDataUrl)
+    const folderHint = this.getCustomFolderPromptHint()
 
     const promptText = `Analyze this screenshot's overall visual scene, layout, and text. Respond ONLY with a valid JSON object:
 {
   "suggestedName": "concise ASCII_with_underscores filename summarizing the main content/context (max 60 chars, no extension, NO menu words like File/Edit/Selection, NEVER guess Excel unless a spreadsheet grid is visible)",
-  "category": "fitting Parent/Subcategory (e.g. Programming/TypeScript, Data-Analytics/Excel, Finance/Banking, Shopping/Orders, Social/Chat, System/Settings, Education/Lecture, Office/Documents, Design/UI-UX, Others)",
+  "category": "fitting folder/category matching the image",
   "description": "1-2 clear sentences in Vietnamese summarizing what the image is about and its visual context",
   "tags": ["3 to 6 relevant keywords"],
   "confidence": 0.9
-}`
+}${folderHint}`
 
     try {
       const response = await fetch(endpoint, {

@@ -115,6 +115,7 @@ export const UpdateSettingsSchema = z.object({
   aiModel: z.string().min(1).max(100).optional(),
   ollamaBaseUrl: z.string().max(500).optional(),
   customCategories: z.array(z.string().min(1).max(120)).max(100).optional(),
+  useDefaultCategories: z.boolean().optional(),
   useClaudeCodeCli: z.boolean().optional(),
   autoApplyRename: z.boolean().optional(),
   organizeMode: z.enum(['category_folders', 'rename_in_place']).optional(),

@@ -55,18 +55,31 @@ export const ReviewPanel: React.FC<ReviewPanelProps> = ({
 
   useEffect(() => {
     let active = true
-    if (window.screenshotAPI?.getPhysicalFolders) {
-      window.screenshotAPI
-        .getPhysicalFolders(destinationRoot)
-        .then((folders) => {
-          if (!active) return
-          const combined = Array.from(new Set([...(folders || []), ...DEFAULT_CATEGORIES])).sort()
-          setAvailableCategories(combined)
-        })
-        .catch(() => {
-          if (active) setAvailableCategories([...DEFAULT_CATEGORIES])
-        })
-    }
+    Promise.all([
+      window.screenshotAPI?.getPhysicalFolders
+        ? window.screenshotAPI.getPhysicalFolders(destinationRoot)
+        : Promise.resolve([]),
+      window.screenshotAPI?.getSettings ? window.screenshotAPI.getSettings() : Promise.resolve(null)
+    ])
+      .then(([folders, currentSettings]) => {
+        if (!active) return
+        const includeDefaults = currentSettings?.useDefaultCategories !== false
+        const combined = Array.from(
+          new Set([
+            ...(folders || []),
+            ...(currentSettings?.customCategories || []),
+            ...(includeDefaults ? DEFAULT_CATEGORIES : [])
+          ])
+        )
+          .filter(Boolean)
+          .sort()
+        setAvailableCategories(
+          combined.length > 0 ? combined : includeDefaults ? [...DEFAULT_CATEGORIES] : ['Others']
+        )
+      })
+      .catch(() => {
+        if (active) setAvailableCategories([...DEFAULT_CATEGORIES])
+      })
     return () => {
       active = false
     }

@@ -16,6 +16,7 @@ import { DEFAULT_CATEGORIES } from '../types/screenshot'
 interface FolderTreeProps {
   distribution: Array<{ category: string; count: number }>
   customCategories?: string[]
+  useDefaultCategories?: boolean
   selectedCategory?: string
   destinationFolder?: string
   onSelectCategory?: (category: string) => void
@@ -27,6 +28,7 @@ interface FolderTreeProps {
 export const FolderTree: React.FC<FolderTreeProps> = ({
   distribution,
   customCategories = [],
+  useDefaultCategories = true,
   selectedCategory = 'all',
   destinationFolder,
   onSelectCategory,
@@ -69,14 +71,19 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
     totalCount += item.count
   }
 
-  // Combine Physical disk folders + Custom categories + DB distribution + Defaults
+  // When useDefaultCategories is false, ONLY show real physical folders on disk + user's customCategories.
+  // Do NOT inject DEFAULT_CATEGORIES or legacy database category names that don't exist on disk.
   const allCategories = Array.from(
-    new Set([
-      ...physicalFolders,
-      ...customCategories,
-      ...DEFAULT_CATEGORIES,
-      ...distribution.map((d) => d.category)
-    ])
+    new Set(
+      useDefaultCategories
+        ? [
+            ...physicalFolders,
+            ...customCategories,
+            ...DEFAULT_CATEGORIES,
+            ...distribution.map((d) => d.category)
+          ]
+        : [...physicalFolders, ...customCategories]
+    )
   ).sort()
 
   const tree = new Map<string, string[]>()

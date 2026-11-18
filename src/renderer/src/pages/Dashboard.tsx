@@ -19,6 +19,7 @@ interface DashboardProps {
   sourceFolder: string
   destinationFolder: string
   customCategories?: string[]
+  useDefaultCategories?: boolean
   onNavigate: (tab: NavTab) => void
   onSelectForReview: (screenshot: ScreenshotRecord) => void
   onOpenLocation: (id: string) => void
@@ -33,6 +34,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   sourceFolder,
   destinationFolder,
   customCategories = [],
+  useDefaultCategories = true,
   onNavigate,
   onSelectForReview,
   onOpenLocation,
@@ -243,6 +245,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <FolderTree
             distribution={stats.categoryDistribution}
             customCategories={customCategories}
+            useDefaultCategories={useDefaultCategories}
             destinationFolder={destinationFolder}
             onAddCategory={onAddCategory}
             onRemoveCategory={onRemoveCategory}

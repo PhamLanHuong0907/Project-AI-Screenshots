@@ -24,6 +24,8 @@ interface LibraryProps {
   allScreenshots: ScreenshotRecord[]
   categoryDistribution: Array<{ category: string; count: number }>
   customCategories?: string[]
+  useDefaultCategories?: boolean
+  destinationFolder?: string
   onSearch: (query: SearchScreenshotsQuery) => Promise<ScreenshotRecord[]>
   onOpenLocation: (id: string) => void
   onAddCategory?: (category: string) => Promise<void>
@@ -35,6 +37,8 @@ export const Library: React.FC<LibraryProps> = ({
   allScreenshots,
   categoryDistribution,
   customCategories = [],
+  useDefaultCategories = true,
+  destinationFolder,
   onSearch,
   onOpenLocation,
   onAddCategory,
@@ -190,6 +194,8 @@ export const Library: React.FC<LibraryProps> = ({
           <FolderTree
             distribution={categoryDistribution}
             customCategories={customCategories}
+            useDefaultCategories={useDefaultCategories}
+            destinationFolder={destinationFolder}
             selectedCategory={selectedCategory}
             onSelectCategory={(cat) => setSelectedCategory(cat)}
             onAddCategory={onAddCategory}

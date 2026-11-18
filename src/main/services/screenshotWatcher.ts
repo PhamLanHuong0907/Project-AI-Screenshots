@@ -4,7 +4,7 @@ import chokidar, { FSWatcher } from 'chokidar'
 import { clipboard } from 'electron'
 import { EventEmitter } from 'events'
 import { ScreenshotRepository } from '../database/screenshotRepository'
-import { isSupportedImageFile } from '../utils/fileUtils'
+import { isSupportedImageFile, removeVietnameseDiacritics } from '../utils/fileUtils'
 import { computeBufferSha256 } from '../utils/hashUtils'
 import { AIService } from './aiService'
 import { FileOrganizer } from './fileOrganizer'
@@ -513,28 +513,86 @@ export class ScreenshotWatcher extends EventEmitter {
     try {
       const analysis = await this.aiService.analyzeScreenshot(activePath)
 
-      // Match AI suggested category against existing disk directories if any exist,
-      // otherwise keep AI's suggested category as recommendation for the user.
+      // Match AI suggested category against existing disk directories
+      const currentSettings = this.settingsService.getPublicSettings()
+      const useDefaults = currentSettings.useDefaultCategories !== false
       let matchedCategory = analysis.category || 'Others'
-      const destDir = this.settingsService.getPublicSettings().destinationFolder
+      const destDir = currentSettings.destinationFolder
+      const existingDirs: string[] = []
+
       if (destDir && fs.existsSync(destDir)) {
         try {
-          const diskEntries = fs.readdirSync(destDir, { withFileTypes: true })
-          const existingDirs = diskEntries.filter((e) => e.isDirectory()).map((e) => e.name)
-
-          if (existingDirs.length > 0) {
-            const directMatch = existingDirs.find(
-              (d) =>
-                d.toLowerCase() === (analysis.category || '').toLowerCase() ||
-                d.toLowerCase() === (analysis.category || '').split('/')[0].toLowerCase()
-            )
-            if (directMatch) {
-              matchedCategory = directMatch
+          const topEntries = fs.readdirSync(destDir, { withFileTypes: true })
+          for (const entry of topEntries) {
+            if (!entry.isDirectory() || entry.name.startsWith('.')) continue
+            existingDirs.push(entry.name)
+            try {
+              const subEntries = fs.readdirSync(path.join(destDir, entry.name), { withFileTypes: true })
+              for (const sub of subEntries) {
+                if (sub.isDirectory() && !sub.name.startsWith('.')) {
+                  existingDirs.push(`${entry.name}/${sub.name}`)
+                }
+              }
+            } catch {
+              // Ignore unreadable subdirectory
             }
           }
         } catch {
           // Ignore
         }
+      }
+
+      const candidateFolders =
+        existingDirs.length > 0
+          ? existingDirs
+          : !useDefaults && currentSettings.customCategories?.length
+            ? currentSettings.customCategories
+            : []
+
+      if (candidateFolders.length > 0) {
+        const directMatch = candidateFolders.find(
+          (d) =>
+            d.toLowerCase() === (analysis.category || '').toLowerCase() ||
+            d.toLowerCase() === (analysis.category || '').split('/')[0].toLowerCase()
+        )
+        if (directMatch) {
+          matchedCategory = directMatch
+        } else if (!useDefaults) {
+          // Score existing folders against AI category, tags, description, and suggestedName
+          const contextText = removeVietnameseDiacritics(
+            `${analysis.category || ''} ${analysis.suggestedName || ''} ${analysis.description || ''} ${(analysis.tags || []).join(' ')}`
+          ).toLowerCase()
+
+          let bestFolder = ''
+          let bestScore = 0
+          for (const folder of candidateFolders) {
+            const tokens = removeVietnameseDiacritics(folder)
+              .toLowerCase()
+              .split(/[^a-z0-9]+/)
+              .filter((t) => t.length >= 2)
+            let score = 0
+            for (const tok of tokens) {
+              if (contextText.includes(tok)) {
+                score += tok.length
+              }
+            }
+            if (score > bestScore) {
+              bestScore = score
+              bestFolder = folder
+            }
+          }
+
+          if (bestFolder && bestScore > 0) {
+            matchedCategory = bestFolder
+          } else {
+            const hasOthers = candidateFolders.find((d) =>
+              /^(others|khac|khác|chung)$/i.test(d)
+            )
+            matchedCategory = hasOthers || candidateFolders[0]
+          }
+        }
+      } else if (!useDefaults) {
+        matchedCategory = 'Others'
       }
 
       let completed = this.repository.update(screenshotId, {

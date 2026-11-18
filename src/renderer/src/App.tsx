@@ -104,8 +104,9 @@ export function App(): React.ReactElement {
             <Dashboard
               stats={stats}
               sourceFolder={settings?.sourceFolder || ''}
-              destinationFolder={destinationDisplay}
+              destinationFolder={settings?.destinationFolder || destinationDisplay}
               customCategories={settings?.customCategories || []}
+              useDefaultCategories={settings?.useDefaultCategories !== false}
               onNavigate={setActiveTab}
               onSelectForReview={handleSelectForReview}
               onOpenLocation={openScreenshotLocation}
@@ -150,6 +151,8 @@ export function App(): React.ReactElement {
               allScreenshots={screenshots}
               categoryDistribution={stats.categoryDistribution}
               customCategories={settings?.customCategories || []}
+              useDefaultCategories={settings?.useDefaultCategories !== false}
+              destinationFolder={settings?.destinationFolder || ''}
               onSearch={searchScreenshots}
               onOpenLocation={openScreenshotLocation}
               onAddCategory={async (cat) => {

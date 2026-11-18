@@ -52,15 +52,18 @@ export const QuickConfirmPopup: React.FC = () => {
           // Ignore
         }
       }
+      const includeDefaults = currentSettings?.useDefaultCategories !== false
       const combined = Array.from(
         new Set([
           ...physical,
           ...(currentSettings?.customCategories || []),
-          ...DEFAULT_CATEGORIES
+          ...(includeDefaults ? DEFAULT_CATEGORIES : [])
         ])
       ).filter(Boolean).sort()
 
-      setAvailableCategories(combined.length > 0 ? combined : [...DEFAULT_CATEGORIES])
+      setAvailableCategories(
+        combined.length > 0 ? combined : includeDefaults ? [...DEFAULT_CATEGORIES] : ['Others']
+      )
 
       if (pending.length > 0) {
         syncItemFields(pending[0])

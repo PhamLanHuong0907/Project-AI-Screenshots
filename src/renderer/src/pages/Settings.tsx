@@ -56,6 +56,7 @@ export const Settings: React.FC<SettingsProps> = ({
   const [autoApplyRename, setAutoApplyRename] = useState(false)
   const [organizeMode, setOrganizeMode] = useState<OrganizeMode>('rename_in_place')
   const [deleteSourceOnConfirm, setDeleteSourceOnConfirm] = useState(true)
+  const [useDefaultCategories, setUseDefaultCategories] = useState(true)
   const [watchClipboard, setWatchClipboard] = useState(true)
 
   const [maxImageSizeMB, setMaxImageSizeMB] = useState(20)
@@ -84,6 +85,7 @@ export const Settings: React.FC<SettingsProps> = ({
     setAutoApplyRename(settings.autoApplyRename)
     setOrganizeMode(settings.organizeMode || 'rename_in_place')
     setDeleteSourceOnConfirm(settings.deleteSourceOnConfirm !== false)
+    setUseDefaultCategories(settings.useDefaultCategories !== false)
     setWatchClipboard(settings.watchClipboard)
 
     const presetList = AI_PROVIDER_MODELS[prov] || []
@@ -160,6 +162,7 @@ export const Settings: React.FC<SettingsProps> = ({
         autoApplyRename,
         organizeMode,
         deleteSourceOnConfirm,
+        useDefaultCategories,
         watchClipboard,
         openaiApiKey: openaiKeyInput.trim() || undefined,
         geminiApiKey: geminiKeyInput.trim() || undefined,
@@ -718,6 +721,23 @@ export const Settings: React.FC<SettingsProps> = ({
                 </button>
               </div>
             </div>
+
+            <label className="flex items-center gap-3 pt-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={useDefaultCategories}
+                onChange={(e) => setUseDefaultCategories(e.target.checked)}
+                className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              <div>
+                <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                  Hiển thị &amp; sử dụng các thư mục mặc định (Default Categories)
+                </p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Khi tắt: ẩn toàn bộ các thư mục mặc định (Programming/React, Data-Analytics/Excel...) khỏi cây thư mục và danh sách chọn. AI sẽ chỉ tự động chọn thư mục phù hợp từ các thư mục hiện có trên máy bạn.
+                </p>
+              </div>
+            </label>
           </div>
         </section>
 

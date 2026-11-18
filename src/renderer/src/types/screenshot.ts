@@ -208,6 +208,7 @@ export interface AppSettings {
   aiModel: string
   ollamaBaseUrl?: string
   customCategories?: string[]
+  useDefaultCategories: boolean
   useClaudeCodeCli: boolean
   claudeCliAvailable: boolean
   claudeCliPath: string
@@ -234,6 +235,7 @@ export interface UpdateSettingsPayload {
   aiModel?: string
   ollamaBaseUrl?: string
   customCategories?: string[]
+  useDefaultCategories?: boolean
   useClaudeCodeCli?: boolean
   autoApplyRename?: boolean
   organizeMode?: OrganizeMode
