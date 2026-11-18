@@ -1,0 +1,100 @@
+{
+  "name": "ai-screenshot-manager",
+  "version": "1.0.0",
+  "description": "Intelligent AI-powered Windows Screenshot Manager built with Electron, React, TypeScript, and OpenAI Vision",
+  "main": "./out/main/index.js",
+  "author": "AI Screenshot Manager Team",
+  "homepage": "https://github.com/ai-screenshot-manager",
+  "scripts": {
+    "format": "prettier --write .",
+    "lint": "eslint . --ext .js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix",
+    "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
+    "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
+    "typecheck": "tsc -b --noEmit && npm run typecheck:node && npm run typecheck:web",
+    "start": "node -e \"delete process.env.ELECTRON_RUN_AS_NODE; const r = require('child_process').spawnSync(process.execPath, ['./node_modules/electron-vite/bin/electron-vite.js', 'preview'], { stdio: 'inherit', env: process.env }); process.exit(r.status || 0);\"",
+    "dev": "node -e \"delete process.env.ELECTRON_RUN_AS_NODE; const r = require('child_process').spawnSync(process.execPath, ['./node_modules/electron-vite/bin/electron-vite.js', 'dev'], { stdio: 'inherit', env: process.env }); process.exit(r.status || 0);\"",
+    "build": "npm run typecheck && electron-vite build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "rebuild": "electron-builder install-app-deps",
+    "build:win": "npm run build && electron-builder --win --dir",
+    "build:installer": "npm run build && electron-builder --win"
+  },
+  "dependencies": {
+    "@electron-toolkit/preload": "^3.0.1",
+    "@electron-toolkit/utils": "^3.0.0",
+    "chokidar": "^3.6.0",
+    "clsx": "^2.1.1",
+    "dotenv": "^16.4.7",
+    "lucide-react": "^0.475.0",
+    "openai": "^4.96.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "sharp": "^0.33.5",
+    "tailwind-merge": "^3.0.1",
+    "tesseract.js": "^7.0.0",
+    "zod": "^3.24.2"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "^11.8.1"
+  },
+  "devDependencies": {
+    "@electron-toolkit/tsconfig": "^1.0.1",
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.13.4",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "electron": "^35.0.0",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^3.0.0",
+    "eslint": "^8.57.1",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.3",
+    "vite": "^6.1.0",
+    "vitest": "^3.0.6"
+  },
+  "build": {
+    "appId": "com.aiscreenshotmanager.app",
+    "productName": "AI Screenshot Manager",
+    "npmRebuild": false,
+    "directories": {
+      "buildResources": "resources",
+      "output": "dist"
+    },
+    "files": [
+      "!**/.vscode/*",
+      "!src/*",
+      "!electron.vite.config.{js,ts,mjs,cjs}",
+      "!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}",
+      "!{.env,.env.*,.npmrc,pnpm-lock.yaml}",
+      "!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}"
+    ],
+    "asarUnpack": [
+      "resources/**",
+      "**/*.node"
+    ],
+    "win": {
+      "executableName": "AI-Screenshot-Manager",
+      "signAndEditExecutable": false,
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "artifactName": "${name}-${version}-setup.${ext}",
+      "shortcutName": "${productName}",
+      "uninstallDisplayName": "${productName}",
+      "createDesktopShortcut": "always"
+    }
+  }
+}
