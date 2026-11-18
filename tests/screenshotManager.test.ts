@@ -536,6 +536,18 @@ describe('AI Screenshot Manager - Critical Test Suite', () => {
       const bankResult = AIService.buildOcrAnalysisFromText(bankText, 92)
       expect(bankResult.category).toBe('Finance/Banking')
       expect(bankResult.suggestedName).toMatch(/Chuyen_Khoan_Thanh_Cong|Vietcombank/)
+
+      // 4. Real-world Vietnamese social post with long announcement headline & poster OCR noise
+      const schoolPostText = [
+        'Đoàn trường THPT Sông Công sư .',
+        '1ngày -@',
+        '[CÔNG BỐ KẾT QUẢ] CUỘC THI THIẾT KẾ LOGO KỶ NIỆM 40 NĂM THÀNH LẬP TRƯỜNG THPT',
+        'Nen Bps Long Dua'
+      ].join('\n')
+
+      const schoolResult = AIService.buildOcrAnalysisFromText(schoolPostText, 82)
+      expect(schoolResult.suggestedName).toMatch(/^Cong_Bo_Ket_Qua_Cuoc_Thi/i)
+      expect(schoolResult.suggestedName).not.toMatch(/Nen_Bps_Long_Dua/i)
     })
   })
 })

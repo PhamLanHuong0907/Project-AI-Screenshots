@@ -737,15 +737,28 @@ Then output ONLY a JSON object with keys: "suggestedName", "category", "descript
       }
     }
 
-    const toAsciiTokens = (input: string): string[] => {
+    const SHORT_STOPWORDS = new Set([
+      'is', 'it', 'in', 'on', 'at', 'to', 'of', 'or', 'by', 'as', 'an', 'be', 'do', 'we',
+      'he', 'me', 'my', 'no', 'so', 'up', 'if', 'va', 'la', 'ma', 'di', 'ra', 'tu', 'vi',
+      'bi', 'co', 'da', 'se', 'io'
+    ])
+
+    const toAsciiTokens = (input: string, allowTwoChar = false): string[] => {
       return removeVietnameseDiacritics(input)
         .split(/[^a-zA-Z0-9]+/)
         .map((w) => w.trim())
         .filter((w) => {
           const lw = w.toLowerCase()
-          if (w.length < 3 && !KNOWN_ACRONYMS.has(lw)) return false
+          if (w.length < 2) return false
+          if (w.length === 2) {
+            if (KNOWN_ACRONYMS.has(lw)) return true
+            if (!allowTwoChar) return false
+            if (SHORT_STOPWORDS.has(lw)) return false
+            return true
+          }
           if (UI_STOPWORDS.has(lw)) return false
-          if (/^\d+$/.test(w) && (w.length < 4 || w.length > 4)) return false // keep 4-digit years like 2026
+          if (/^(https?|www|githubio|ocrgithub)$/.test(lw)) return false
+          if (/^\d+$/.test(w) && (w.length < 2 || w.length > 4)) return false
           // Filter obvious OCR gibberish without vowels (unless acronym or digits)
           if (w.length >= 4 && !/[aeiouy\d]/i.test(w) && !KNOWN_ACRONYMS.has(lw)) return false
           return true
@@ -755,10 +768,10 @@ Then output ONLY a JSON object with keys: "suggestedName", "category", "descript
     const formatTitleToken = (w: string): string => {
       if (KNOWN_ACRONYMS.has(w.toLowerCase())) return w.toUpperCase()
       if (/^[A-Z]{2,}\d*$/.test(w)) return w
-      return w.charAt(0).toUpperCase() + w.slice(1)
+      return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
     }
 
-    // 3. Extract high-signal topic tokens (Errors > Code Symbols > Top Headings > TF Keywords)
+    // 3. Extract high-signal topic tokens (Errors > Code Symbols > Best Headline > TF Keywords)
     let topicTokens: string[] = []
 
     const errorMatch = cleanText.match(
@@ -779,28 +792,43 @@ Then output ONLY a JSON object with keys: "suggestedName", "category", "descript
       }
     }
 
-    // Scan top 50% of lines for a clean heading/title line
+    // Scan top 60% of lines for the strongest real-world heading/title line (supports long Vietnamese/English headlines)
     if (topicTokens.length < 2 && activeLines.length > 0) {
-      const topLimit = Math.max(3, Math.ceil(activeLines.length * 0.5))
+      const topLimit = Math.max(5, Math.ceil(activeLines.length * 0.6))
       let bestLineTokens: string[] = []
-      let bestLineScore = 0
+      let bestLineScore = -1
+
+      const vnDiacriticWordRegex = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i
 
       for (let i = 0; i < Math.min(topLimit, activeLines.length); i++) {
         const line = activeLines[i]
-        // Skip URLs or menu bars with many short words
-        if (/https?:\/\/|www\./i.test(line)) continue
-        const tokens = toAsciiTokens(line)
-        if (tokens.length >= 2 && tokens.length <= 7) {
-          const score = tokens.length * 2 + (i < 4 ? 3 : 0)
-          if (score > bestLineScore) {
-            bestLineScore = score
-            bestLineTokens = tokens.slice(0, 4)
-          }
+        // Skip URLs, domain lines, or social timestamps like "1 ngày - @"
+        if (/https?:\/\/|www\.|\.github\.io|\.com\/|^\d+\s*(ngay|ngày|gio|giờ|phut|phút|h|m|d)\b/i.test(line)) {
+          continue
+        }
+        const tokens = toAsciiTokens(line, true)
+        if (tokens.length < 2) continue
+
+        const originalWords = line.split(/\s+/)
+        const vnDiacriticWords = originalWords.filter((w) => vnDiacriticWordRegex.test(w)).length
+        const hasAnnouncementTag = /\[[^\]]{3,}\]/.test(line)
+        const upperWords = originalWords.filter((w) => w.length >= 2 && w === w.toUpperCase() && /\p{L}/u.test(w)).length
+
+        const score =
+          Math.min(tokens.length, 6) * 2 +
+          vnDiacriticWords * 3 +
+          (hasAnnouncementTag ? 12 : 0) +
+          (upperWords >= 3 ? 8 : 0) +
+          (i < 5 ? 6 - i : 0)
+
+        if (score > bestLineScore) {
+          bestLineScore = score
+          bestLineTokens = tokens.slice(0, 6)
         }
       }
 
       if (bestLineTokens.length >= 2) {
-        topicTokens = Array.from(new Set([...topicTokens, ...bestLineTokens])).slice(0, 4)
+        topicTokens = Array.from(new Set([...topicTokens, ...bestLineTokens])).slice(0, 6)
       }
     }
 
@@ -837,7 +865,7 @@ Then output ONLY a JSON object with keys: "suggestedName", "category", "descript
 
     // Assemble final suggestedName purely from actual image content (no forced category/folder prefix)
     const contentTokens = topicTokens
-      .slice(0, 5)
+      .slice(0, 6)
       .map(formatTitleToken)
 
     const rawSuggested =
