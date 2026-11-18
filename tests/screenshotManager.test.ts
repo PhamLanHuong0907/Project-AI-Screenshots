@@ -492,5 +492,40 @@ describe('AI Screenshot Manager - Critical Test Suite', () => {
       expect(fs.existsSync(expectedRenamedInPlace)).toBe(true)
       expect(fs.existsSync(rawPath)).toBe(false)
     })
+
+    it('improves Tesseract OCR preprocessing and generates meaningful filenames without UI chrome', async () => {
+      const imageService = new ImageService()
+      const darkImgPath = path.join(tempDir, 'dark_sample.png')
+      fs.writeFileSync(darkImgPath, SAMPLE_PNG_BUFFER)
+
+      const ocrPrepared = await imageService.prepareImageForOCR(darkImgPath)
+      expect(Buffer.isBuffer(ocrPrepared.buffer)).toBe(true)
+      expect(ocrPrepared.buffer.length).toBeGreaterThan(0)
+
+      // 1. VS Code TypeScript error screenshot with noisy UI menu bar
+      const tsOcrText = [
+        'File Edit Selection View Go Run Terminal Help',
+        'Explorer Outline Timeline',
+        'TS2339: Property settings does not exist on type Watcher',
+        'src/main/services/screenshotWatcher.ts'
+      ].join('\n')
+
+      const tsResult = AIService.buildOcrAnalysisFromText(tsOcrText, 85)
+      expect(tsResult.category).toBe('Programming/TypeScript')
+      expect(tsResult.suggestedName).toContain('TypeScript_')
+      expect(tsResult.suggestedName).toContain('TS2339')
+      expect(tsResult.suggestedName).not.toMatch(/File|Edit|Selection/i)
+
+      // 2. Vietnamese Excel/Business report screenshot
+      const vnReportText = [
+        'Home Insert Page Layout Formulas Data Review View',
+        'Báo cáo doanh thu quý 4 năm 2026',
+        'Excel VLOOKUP Tổng doanh thu lợi nhuận'
+      ].join('\n')
+
+      const vnResult = AIService.buildOcrAnalysisFromText(vnReportText, 90)
+      expect(vnResult.category).toBe('Data-Analytics/Excel')
+      expect(vnResult.suggestedName).toMatch(/^Excel_Bao_Cao_Doanh_Thu/)
+    })
   })
 })

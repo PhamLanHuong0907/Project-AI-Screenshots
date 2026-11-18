@@ -3,6 +3,7 @@ import path from 'path'
 import { promisify } from 'util'
 import OpenAI from 'openai'
 import { createWorker } from 'tesseract.js'
+import { removeVietnameseDiacritics, sanitizeFilename } from '../utils/fileUtils'
 import { AIAnalysisResponseSchema, ValidatedAIAnalysis } from '../utils/validation'
 import { ImageService } from './imageService'
 import { SettingsService } from './settingsService'
@@ -485,95 +486,344 @@ Then output ONLY a JSON object with keys: "suggestedName", "category", "descript
 
   /**
    * 4. Local Tesseract OCR Implementation (Offline, no API key required)
-   * Analyzes text directly from the screenshot locally using Tesseract.js / Tesseract OCR engine.
+   * Preprocesses the image (dark-mode inversion, grayscale, upscaling, sharpening),
+   * extracts text locally via Tesseract.js, and derives a structured filename & category.
    */
   private async analyzeWithTesseract(
     filePath: string,
     langs: string = 'vie+eng'
   ): Promise<ValidatedAIAnalysis> {
+    const { buffer } = await this.imageService.prepareImageForOCR(filePath)
     const worker = await createWorker(langs)
     try {
-      const ret = await worker.recognize(filePath)
-      const text = (ret.data?.text || '').trim()
-      const words = text
-        .split(/\s+/)
-        .map((w) => w.replace(/[^\p{L}\p{N}_-]/gu, '').trim())
-        .filter((w) => w.length > 1)
+      await worker.setParameters({
+        preserve_interword_spaces: '1'
+      })
+      const ret = await worker.recognize(buffer)
+      const rawText = (ret.data?.text || '').trim()
+      const rawConfidence = typeof ret.data?.confidence === 'number' ? ret.data.confidence : 0
+      const pageData = ret.data as unknown as {
+        lines?: Array<{ text?: string; confidence?: number }>
+      } | null
+      const lines = Array.isArray(pageData?.lines)
+        ? pageData.lines.map((l) => ({
+            text: l.text || '',
+            confidence: typeof l.confidence === 'number' ? l.confidence : 50
+          }))
+        : undefined
 
-      // Category detection based on keywords
-      const lowerText = text.toLowerCase()
-      let category = 'Others'
-      let topic = 'Screenshot'
-
-      if (lowerText.includes('excel') || lowerText.includes('sheet') || lowerText.includes('cell') || lowerText.includes('vlookup') || lowerText.includes('sumifs')) {
-        category = 'Data-Analytics/Excel'
-        topic = 'Excel_Worksheet'
-      } else if (lowerText.includes('power bi') || lowerText.includes('powerbi') || lowerText.includes('dax') || lowerText.includes('kpi')) {
-        category = 'Data-Analytics/PowerBI'
-        topic = 'PowerBI_Dashboard'
-      } else if (lowerText.includes('tableau')) {
-        category = 'Data-Analytics/Tableau'
-        topic = 'Tableau_Analysis'
-      } else if (lowerText.includes('select') && lowerText.includes('from') && (lowerText.includes('where') || lowerText.includes('table'))) {
-        category = 'Database/SQL'
-        topic = 'SQL_Query'
-      } else if (lowerText.includes('react') || lowerText.includes('usestate') || lowerText.includes('useeffect') || lowerText.includes('component')) {
-        category = 'Programming/React'
-        topic = 'React_Component'
-      } else if (lowerText.includes('interface') || lowerText.includes('typescript') || lowerText.includes('.ts') || lowerText.includes('.tsx')) {
-        category = 'Programming/TypeScript'
-        topic = 'TypeScript_Source'
-      } else if (lowerText.includes('python') || lowerText.includes('def ') || lowerText.includes('import pandas')) {
-        category = 'Programming/Python'
-        topic = 'Python_Code'
-      } else if (lowerText.includes('error') || lowerText.includes('exception') || lowerText.includes('failed') || lowerText.includes('traceback') || lowerText.includes('bug')) {
-        category = 'Programming/Web-Development'
-        topic = 'Error_Stacktrace'
-      } else if (lowerText.includes('hadoop') || lowerText.includes('spark') || lowerText.includes('hive') || lowerText.includes('sqoop')) {
-        category = 'Big-Data/Hadoop'
-        topic = 'BigData_System'
-      } else if (lowerText.includes('invoice') || lowerText.includes('hóa đơn') || lowerText.includes('biên lai') || lowerText.includes('receipt') || lowerText.includes('total')) {
-        category = 'Office/Documents'
-        topic = 'Invoice_Receipt'
-      } else if (lowerText.includes('figma') || lowerText.includes('frame') || lowerText.includes('layer') || lowerText.includes('design')) {
-        category = 'Design/UI-UX'
-        topic = 'UI_Design'
-      }
-
-      // Generate suggestedName from detected topic and key words
-      const asciiKeywords = words
-        .map((w) =>
-          w
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .replace(/đ/g, 'd')
-            .replace(/Đ/g, 'D')
-            .replace(/[^a-zA-Z0-9]/g, '')
-        )
-        .filter((w) => w.length >= 3 && !['the', 'and', 'with', 'for', 'this', 'that', 'cua', 'trong', 'duoc'].includes(w.toLowerCase()))
-        .slice(0, 3)
-
-      const safeCategoryPrefix = category.split('/')[1] || category.split('/')[0]
-      const descriptivePart = asciiKeywords.length > 0 ? asciiKeywords.join('_') : topic
-      let suggestedName = `${safeCategoryPrefix}_${descriptivePart}`.slice(0, 50)
-      suggestedName = suggestedName.replace(/_+/g, '_').replace(/^_|_$/g, '') || 'OCR_Screenshot'
-
-      const extractedSnippet = text.length > 120 ? text.slice(0, 120) + '...' : text
-      const description = text.length > 0
-        ? `Trích xuất OCR nội dung: "${extractedSnippet.replace(/\n+/g, ' ')}"`
-        : 'Ảnh chụp màn hình (nhận diện qua Tesseract OCR offline).'
-
-      const tags = Array.from(new Set(['Tesseract_OCR', safeCategoryPrefix, ...asciiKeywords.slice(0, 3)]))
-
-      return {
-        suggestedName,
-        category,
-        description,
-        tags,
-        confidence: text.length > 30 ? 0.88 : 0.65
-      }
+      return AIService.buildOcrAnalysisFromText(rawText, rawConfidence, lines)
     } finally {
       await worker.terminate()
+    }
+  }
+
+  /**
+   * Converts raw OCR text (and optional per-line confidence) into a clean,
+   * descriptive filename, category, Vietnamese summary, and tags.
+   */
+  public static buildOcrAnalysisFromText(
+    rawText: string,
+    ocrConfidence = 75,
+    lines?: Array<{ text: string; confidence: number }>
+  ): ValidatedAIAnalysis {
+    const UI_STOPWORDS = new Set([
+      'the', 'and', 'with', 'for', 'this', 'that', 'from', 'are', 'was', 'were', 'have', 'has',
+      'had', 'not', 'but', 'you', 'your', 'can', 'will', 'all', 'one', 'two', 'use', 'using',
+      'into', 'about', 'than', 'then', 'them', 'they', 'what', 'when', 'where', 'which', 'while',
+      'file', 'edit', 'view', 'selection', 'go', 'run', 'terminal', 'help', 'window', 'tools',
+      'insert', 'format', 'home', 'share', 'search', 'type', 'here', 'back', 'forward', 'reload',
+      'refresh', 'close', 'minimize', 'maximize', 'cancel', 'yes', 'save', 'open', 'new', 'tab',
+      'bookmarks', 'history', 'downloads', 'extensions', 'settings', 'profile', 'menu', 'more',
+      'loading', 'untitled', 'localhost', 'http', 'https', 'www', 'com', 'org', 'net', 'index',
+      'src', 'app', 'page', 'line', 'col', 'utf8', 'crlf', 'spaces', 'explorer', 'outline',
+      'timeline', 'problems', 'output', 'debug', 'console', 'ports',
+      'formulas', 'layout', 'review',
+      'cua', 'trong', 'duoc', 'nhung', 'cac', 'cho', 'voi', 'khi', 'neu', 'nhu', 'nay', 'day',
+      'sau', 'truoc', 'dang', 'xem', 'them', 'xoa', 'sua', 'luu', 'huy', 'dong', 'tim', 'kiem',
+      'trang', 'chu', 'tep', 'tin', 'chinh', 'cai', 'dat', 'la', 'va', 'hoac',
+      'tai', 've', 'len', 'xuong', 'bat', 'tat'
+    ])
+
+    const KNOWN_ACRONYMS = new Set([
+      'sql', 'api', 'ocr', 'csv', 'pdf', 'kpi', 'ui', 'ux', 'ts', 'js', 'cli', 'rgb', 'png',
+      'jpg', 'npm', 'exe', 'erd', 'dax', 'tsx', 'jsx', 'css', 'html', 'json', 'xml', 'ssh',
+      'git', 'url', 'uri', 'sdk', 'ide', 'cpu', 'gpu', 'ram', 'mb', 'gb', 'ai', 'ml', 'bi'
+    ])
+
+    // 1. Filter and clean lines
+    const rawLineList =
+      lines && lines.length > 0
+        ? lines.filter((l) => l.confidence >= 30 && l.text.trim().length >= 2).map((l) => l.text)
+        : rawText.split(/\r?\n/)
+
+    const fallbackLines = rawText.split(/\r?\n/).filter((l) => l.trim().length >= 2)
+    const activeLines = (rawLineList.length > 0 ? rawLineList : fallbackLines)
+      .map((l) => l.replace(/[|~^`©®™•▪▫]+/g, ' ').replace(/\s+/g, ' ').trim())
+      .filter((l) => l.length >= 2)
+
+    const cleanText = activeLines.join('\n')
+    const lowerText = cleanText.toLowerCase()
+
+    // 2. Weighted domain classification
+    const DOMAIN_RULES: Array<{
+      category: string
+      prefix: string
+      labelVi: string
+      keywords: Array<[string, number]>
+    }> = [
+      {
+        category: 'Data-Analytics/Excel',
+        prefix: 'Excel',
+        labelVi: 'Bảng tính Excel',
+        keywords: [
+          ['excel', 5], ['vlookup', 5], ['xlookup', 5], ['sumifs', 5], ['pivot', 4],
+          ['formulas', 3], ['page layout', 3], ['worksheet', 4], ['spreadsheet', 3],
+          ['bảng tính', 4], ['conditional formatting', 4], ['sheet1', 3]
+        ]
+      },
+      {
+        category: 'Data-Analytics/PowerBI',
+        prefix: 'PowerBI',
+        labelVi: 'Báo cáo Power BI',
+        keywords: [
+          ['power bi', 5], ['powerbi', 5], ['dax', 4], ['kpi', 3], ['dashboard', 2], ['measure', 2]
+        ]
+      },
+      {
+        category: 'Data-Analytics/Tableau',
+        prefix: 'Tableau',
+        labelVi: 'Biểu đồ Tableau',
+        keywords: [['tableau', 5], ['workbook', 2], ['dimension', 2]]
+      },
+      {
+        category: 'Database/SQL',
+        prefix: 'SQL',
+        labelVi: 'Truy vấn SQL / Cơ sở dữ liệu',
+        keywords: [
+          ['select ', 3], ['from ', 2], ['where ', 2], ['join ', 2], ['insert into', 4],
+          ['create table', 4], ['postgresql', 4], ['mysql', 4], ['sqlite', 4], ['sql', 3]
+        ]
+      },
+      {
+        category: 'Programming/React',
+        prefix: 'React',
+        labelVi: 'Mã nguồn React',
+        keywords: [
+          ['react', 4], ['usestate', 4], ['useeffect', 4], ['usecallback', 4],
+          ['jsx', 3], ['tsx', 3], ['component', 2], ['props', 2]
+        ]
+      },
+      {
+        category: 'Programming/TypeScript',
+        prefix: 'TypeScript',
+        labelVi: 'Mã nguồn / Lỗi TypeScript',
+        keywords: [
+          ['typescript', 4], ['interface ', 3], ['tsconfig', 4], ['.tsx', 3],
+          ['.ts', 2], ['typecheck', 4], ['ts2', 3], ['cannot find', 2]
+        ]
+      },
+      {
+        category: 'Programming/Python',
+        prefix: 'Python',
+        labelVi: 'Mã nguồn Python',
+        keywords: [
+          ['python', 4], ['def ', 3], ['import pandas', 4], ['numpy', 4], ['traceback', 4], ['.py', 2]
+        ]
+      },
+      {
+        category: 'Programming/Web-Development',
+        prefix: 'Dev',
+        labelVi: 'Lập trình / Terminal',
+        keywords: [
+          ['error', 2], ['exception', 3], ['failed', 2], ['npm ', 3], ['pnpm', 3],
+          ['powershell', 3], ['terminal', 2], ['console', 2], ['json', 2], ['api', 2]
+        ]
+      },
+      {
+        category: 'Big-Data/Hadoop',
+        prefix: 'BigData',
+        labelVi: 'Hệ thống Big Data',
+        keywords: [['hadoop', 4], ['spark', 4], ['hive', 4], ['sqoop', 4], ['hdfs', 4]]
+      },
+      {
+        category: 'Office/Documents',
+        prefix: 'Doc',
+        labelVi: 'Tài liệu / Hóa đơn',
+        keywords: [
+          ['hóa đơn', 4], ['biên lai', 4], ['chuyển khoản', 4], ['vietcombank', 4],
+          ['techcombank', 4], ['mbbank', 4], ['momo', 4], ['vnpay', 4], ['tổng tiền', 3],
+          ['thành tiền', 3], ['invoice', 4], ['receipt', 4], ['báo cáo', 3],
+          ['doanh thu', 3], ['lợi nhuận', 3], ['hợp đồng', 3]
+        ]
+      },
+      {
+        category: 'Design/UI-UX',
+        prefix: 'Design',
+        labelVi: 'Thiết kế UI/UX',
+        keywords: [['figma', 5], ['wireframe', 4], ['prototype', 3], ['mockup', 3], ['ui/ux', 4]]
+      },
+      {
+        category: 'Education/Lecture',
+        prefix: 'Study',
+        labelVi: 'Tài liệu học tập',
+        keywords: [
+          ['bài giảng', 4], ['giáo trình', 4], ['bài tập', 4], ['đề thi', 4],
+          ['chương ', 3], ['lecture', 4], ['assignment', 4], ['university', 3]
+        ]
+      }
+    ]
+
+    let bestDomain = { category: 'Others', prefix: 'Screen', labelVi: 'Ảnh chụp màn hình', score: 0 }
+    for (const rule of DOMAIN_RULES) {
+      let score = 0
+      for (const [term, weight] of rule.keywords) {
+        if (lowerText.includes(term)) {
+          score += weight
+        }
+      }
+      if (score > bestDomain.score) {
+        bestDomain = { category: rule.category, prefix: rule.prefix, labelVi: rule.labelVi, score }
+      }
+    }
+
+    const toAsciiTokens = (input: string): string[] => {
+      return removeVietnameseDiacritics(input)
+        .split(/[^a-zA-Z0-9]+/)
+        .map((w) => w.trim())
+        .filter((w) => {
+          const lw = w.toLowerCase()
+          if (w.length < 3 && !KNOWN_ACRONYMS.has(lw)) return false
+          if (UI_STOPWORDS.has(lw)) return false
+          if (/^\d+$/.test(w) && (w.length < 4 || w.length > 4)) return false // keep 4-digit years like 2026
+          // Filter obvious OCR gibberish without vowels (unless acronym or digits)
+          if (w.length >= 4 && !/[aeiouy\d]/i.test(w) && !KNOWN_ACRONYMS.has(lw)) return false
+          return true
+        })
+    }
+
+    const formatTitleToken = (w: string): string => {
+      if (KNOWN_ACRONYMS.has(w.toLowerCase())) return w.toUpperCase()
+      if (/^[A-Z]{2,}\d*$/.test(w)) return w
+      return w.charAt(0).toUpperCase() + w.slice(1)
+    }
+
+    // 3. Extract high-signal topic tokens (Errors > Code Symbols > Top Headings > TF Keywords)
+    let topicTokens: string[] = []
+
+    const errorMatch = cleanText.match(
+      /\b(TS\d{4}|ERR_[A-Z0-9_]+|TypeError|SyntaxError|ReferenceError|RangeError)\b[:\s-]*([^\n]{0,50})/i
+    )
+    if (errorMatch) {
+      const code = errorMatch[1]
+      const detail = toAsciiTokens(errorMatch[2] || '').slice(0, 3)
+      topicTokens = [code, ...detail]
+    }
+
+    if (topicTokens.length === 0) {
+      const symbolMatch = cleanText.match(
+        /\b(?:function|class|interface|const|def|export\s+class)\s+([A-Za-z_][A-Za-z0-9_]{2,28})/
+      )
+      if (symbolMatch) {
+        topicTokens = [symbolMatch[1]]
+      }
+    }
+
+    // Scan top 50% of lines for a clean heading/title line
+    if (topicTokens.length < 2 && activeLines.length > 0) {
+      const topLimit = Math.max(3, Math.ceil(activeLines.length * 0.5))
+      let bestLineTokens: string[] = []
+      let bestLineScore = 0
+
+      for (let i = 0; i < Math.min(topLimit, activeLines.length); i++) {
+        const line = activeLines[i]
+        // Skip URLs or menu bars with many short words
+        if (/https?:\/\/|www\./i.test(line)) continue
+        const tokens = toAsciiTokens(line)
+        if (tokens.length >= 2 && tokens.length <= 7) {
+          const score = tokens.length * 2 + (i < 4 ? 3 : 0)
+          if (score > bestLineScore) {
+            bestLineScore = score
+            bestLineTokens = tokens.slice(0, 4)
+          }
+        }
+      }
+
+      if (bestLineTokens.length >= 2) {
+        topicTokens = Array.from(new Set([...topicTokens, ...bestLineTokens])).slice(0, 4)
+      }
+    }
+
+    // Supplement with TF-weighted keywords across the whole text
+    const freqMap = new Map<string, { display: string; score: number }>()
+    activeLines.forEach((line, lineIdx) => {
+      const weight = lineIdx < Math.ceil(activeLines.length * 0.4) ? 2 : 1
+      for (const tok of toAsciiTokens(line)) {
+        const key = tok.toLowerCase()
+        const prev = freqMap.get(key)
+        const capBonus = /^[A-Z]/.test(tok) ? 1 : 0
+        if (prev) {
+          prev.score += weight
+        } else {
+          freqMap.set(key, { display: tok, score: weight + capBonus })
+        }
+      }
+    })
+
+    const rankedKeywords = Array.from(freqMap.values())
+      .sort((a, b) => b.score - a.score)
+      .map((item) => item.display)
+
+    if (topicTokens.length < 3) {
+      const existingLower = new Set(topicTokens.map((t) => t.toLowerCase()))
+      for (const kw of rankedKeywords) {
+        if (!existingLower.has(kw.toLowerCase())) {
+          topicTokens.push(kw)
+          existingLower.add(kw.toLowerCase())
+          if (topicTokens.length >= 4) break
+        }
+      }
+    }
+
+    // Assemble final suggestedName
+    const prefixLower = bestDomain.prefix.toLowerCase()
+    const filteredTopic = topicTokens
+      .filter((t) => t.toLowerCase() !== prefixLower)
+      .slice(0, 4)
+      .map(formatTitleToken)
+
+    const rawSuggested =
+      filteredTopic.length > 0
+        ? `${bestDomain.prefix}_${filteredTopic.join('_')}`
+        : `${bestDomain.prefix}_Capture`
+
+    const suggestedName = sanitizeFilename(rawSuggested, bestDomain.prefix)
+
+    const cleanSnippet = activeLines.slice(0, 3).join(' | ').slice(0, 140)
+    const description = cleanSnippet
+      ? `${bestDomain.labelVi} (OCR): "${cleanSnippet}${cleanText.length > 140 ? '...' : ''}"`
+      : `${bestDomain.labelVi} (nhận diện qua Tesseract OCR offline).`
+
+    const tags = Array.from(
+      new Set([
+        'Tesseract_OCR',
+        bestDomain.prefix,
+        ...filteredTopic.slice(0, 3)
+      ])
+    ).filter(Boolean)
+
+    // Normalize confidence from Tesseract's 0-100 scale
+    const normalizedConf = Math.max(
+      0.45,
+      Math.min(0.95, (ocrConfidence > 0 ? ocrConfidence / 100 : 0.6) * (cleanText.length > 25 ? 1 : 0.85))
+    )
+
+    return {
+      suggestedName,
+      category: bestDomain.category,
+      description,
+      tags,
+      confidence: Number(normalizedConf.toFixed(2))
     }
   }
 
