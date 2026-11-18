@@ -11,6 +11,14 @@ export interface ImageMetadataInfo {
   mimeType: string
 }
 
+export interface VisualContextInfo {
+  width: number
+  height: number
+  orientation: 'landscape' | 'portrait' | 'square'
+  isDarkMode: boolean
+  isColorfulGraphic: boolean
+}
+
 const MIME_BY_EXT: Record<string, string> = {
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
@@ -108,7 +116,7 @@ export class ImageService {
    */
   public async prepareImageForOCR(
     filePath: string
-  ): Promise<{ buffer: Buffer; isDarkMode: boolean }> {
+  ): Promise<{ buffer: Buffer; isDarkMode: boolean; visualContext: VisualContextInfo }> {
     try {
       const basePipeline = sharp(filePath)
       const [meta, stats] = await Promise.all([basePipeline.metadata(), basePipeline.stats()])
@@ -120,6 +128,28 @@ export class ImageService {
           : 255
       const isDarkMode = avgBrightness < 120
 
+      const channelMeans = rgbChannels.map((c) => c.mean)
+      const channelSpread =
+        channelMeans.length >= 3 ? Math.max(...channelMeans) - Math.min(...channelMeans) : 0
+      const avgStdev =
+        rgbChannels.length > 0
+          ? rgbChannels.reduce((sum, ch) => sum + ch.stdev, 0) / rgbChannels.length
+          : 0
+      const isColorfulGraphic = channelSpread > 18 || avgStdev > 62
+
+      const width = meta.width || 0
+      const height = meta.height || 0
+      const orientation: VisualContextInfo['orientation'] =
+        width > height * 1.15 ? 'landscape' : height > width * 1.15 ? 'portrait' : 'square'
+
+      const visualContext: VisualContextInfo = {
+        width,
+        height,
+        orientation,
+        isDarkMode,
+        isColorfulGraphic
+      }
+
       let pipeline = sharp(filePath)
         .flatten({ background: isDarkMode ? '#0f172a' : '#ffffff' })
         .grayscale()
@@ -128,7 +158,6 @@ export class ImageService {
         pipeline = pipeline.negate({ alpha: false })
       }
 
-      const width = meta.width || 0
       if (width > 0 && width < 1800) {
         const targetWidth = Math.min(2600, Math.round(width * 1.5))
         pipeline = pipeline.resize({
@@ -143,10 +172,20 @@ export class ImageService {
         .png()
         .toBuffer()
 
-      return { buffer, isDarkMode }
+      return { buffer, isDarkMode, visualContext }
     } catch {
       const rawBuffer = await fs.promises.readFile(filePath)
-      return { buffer: rawBuffer, isDarkMode: false }
+      return {
+        buffer: rawBuffer,
+        isDarkMode: false,
+        visualContext: {
+          width: 0,
+          height: 0,
+          orientation: 'landscape',
+          isDarkMode: false,
+          isColorfulGraphic: false
+        }
+      }
     }
   }
 

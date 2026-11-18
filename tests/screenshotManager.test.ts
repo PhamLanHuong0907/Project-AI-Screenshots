@@ -545,9 +545,18 @@ describe('AI Screenshot Manager - Critical Test Suite', () => {
         'Nen Bps Long Dua'
       ].join('\n')
 
-      const schoolResult = AIService.buildOcrAnalysisFromText(schoolPostText, 82)
+      const schoolResult = AIService.buildOcrAnalysisFromText(schoolPostText, 82, undefined, {
+        width: 1200,
+        height: 900,
+        orientation: 'landscape',
+        isDarkMode: false,
+        isColorfulGraphic: true
+      })
+      expect(schoolResult.category).toBe('Social/Chat')
       expect(schoolResult.suggestedName).toMatch(/^Cong_Bo_Ket_Qua_Cuoc_Thi/i)
       expect(schoolResult.suggestedName).not.toMatch(/Nen_Bps_Long_Dua/i)
+      expect(schoolResult.description).toContain('Đoàn trường THPT Sông Công')
+      expect(schoolResult.description).toContain('có hình ảnh/đồ họa màu sắc minh họa')
     })
   })
 })
