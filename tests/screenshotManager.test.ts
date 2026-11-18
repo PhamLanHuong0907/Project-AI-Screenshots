@@ -512,11 +512,10 @@ describe('AI Screenshot Manager - Critical Test Suite', () => {
 
       const tsResult = AIService.buildOcrAnalysisFromText(tsOcrText, 85)
       expect(tsResult.category).toBe('Programming/TypeScript')
-      expect(tsResult.suggestedName).toContain('TypeScript_')
       expect(tsResult.suggestedName).toContain('TS2339')
       expect(tsResult.suggestedName).not.toMatch(/File|Edit|Selection/i)
 
-      // 2. Vietnamese Excel/Business report screenshot
+      // 2. Vietnamese Excel/Business report screenshot — name reflects content, not forced folder prefix
       const vnReportText = [
         'Home Insert Page Layout Formulas Data Review View',
         'Báo cáo doanh thu quý 4 năm 2026',
@@ -525,7 +524,18 @@ describe('AI Screenshot Manager - Critical Test Suite', () => {
 
       const vnResult = AIService.buildOcrAnalysisFromText(vnReportText, 90)
       expect(vnResult.category).toBe('Data-Analytics/Excel')
-      expect(vnResult.suggestedName).toMatch(/^Excel_Bao_Cao_Doanh_Thu/)
+      expect(vnResult.suggestedName).toMatch(/^Bao_Cao_Doanh_Thu/)
+
+      // 3. Diverse non-coding/non-office content: Vietcombank transfer receipt
+      const bankText = [
+        'Vietcombank',
+        'Chuyển khoản thành công',
+        'Số tài khoản thụ hưởng 0123456789'
+      ].join('\n')
+
+      const bankResult = AIService.buildOcrAnalysisFromText(bankText, 92)
+      expect(bankResult.category).toBe('Finance/Banking')
+      expect(bankResult.suggestedName).toMatch(/Chuyen_Khoan_Thanh_Cong|Vietcombank/)
     })
   })
 })
