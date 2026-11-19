@@ -91,6 +91,7 @@
       ]
     },
     "nsis": {
+      "include": "resources/installer.nsh",
       "artifactName": "${name}-${version}-setup.${ext}",
       "shortcutName": "${productName}",
       "uninstallDisplayName": "${productName}",

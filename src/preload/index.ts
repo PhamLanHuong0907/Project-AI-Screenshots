@@ -82,7 +82,9 @@ const screenshotAPI: ScreenshotAPI = {
   createPhysicalFolder: (folderName: string) =>
     ipcRenderer.invoke('system:createPhysicalFolder', folderName),
   closeQuickPopup: () => ipcRenderer.invoke('system:closeQuickPopup'),
-  openMainWindow: () => ipcRenderer.invoke('system:openMainWindow')
+  openMainWindow: () => ipcRenderer.invoke('system:openMainWindow'),
+  installOllama: () => ipcRenderer.invoke('system:installOllama'),
+  pullOllamaModel: (model: string) => ipcRenderer.invoke('system:pullOllamaModel', model)
 }
 
 if (process.contextIsolated) {

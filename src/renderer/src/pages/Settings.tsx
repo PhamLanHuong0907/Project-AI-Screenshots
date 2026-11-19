@@ -67,6 +67,7 @@ export const Settings: React.FC<SettingsProps> = ({
 
   const [saving, setSaving] = useState(false)
   const [testingApi, setTestingApi] = useState(false)
+  const [ollamaActionBusy, setOllamaActionBusy] = useState<'install' | 'pull' | null>(null)
   const [saveBanner, setSaveBanner] = useState<{
     type: 'success' | 'error'
     message: string
@@ -207,6 +208,49 @@ export const Settings: React.FC<SettingsProps> = ({
       })
     } finally {
       setTestingApi(false)
+    }
+  }
+
+  const handleInstallOllama = async () => {
+    setOllamaActionBusy('install')
+    setValidationResult(null)
+    try {
+      const res = await window.screenshotAPI.installOllama()
+      setValidationResult({
+        valid: res.success,
+        message: res.message,
+        provider: 'ollama'
+      })
+    } catch (err) {
+      setValidationResult({
+        valid: false,
+        message: (err as Error).message || 'Không thể cài đặt Ollama.',
+        provider: 'ollama'
+      })
+    } finally {
+      setOllamaActionBusy(null)
+    }
+  }
+
+  const handlePullOllamaModel = async () => {
+    setOllamaActionBusy('pull')
+    setValidationResult(null)
+    try {
+      const res = await window.screenshotAPI.pullOllamaModel(effectiveModel)
+      setValidationResult({
+        valid: res.success,
+        message: res.message,
+        provider: 'ollama',
+        model: effectiveModel
+      })
+    } catch (err) {
+      setValidationResult({
+        valid: false,
+        message: (err as Error).message || `Không thể tải model ${effectiveModel}.`,
+        provider: 'ollama'
+      })
+    } finally {
+      setOllamaActionBusy(null)
     }
   }
 
@@ -469,6 +513,42 @@ export const Settings: React.FC<SettingsProps> = ({
                       <Sparkles className="w-3.5 h-3.5" />
                     )}
                     <span>Kiểm tra Ollama</span>
+                  </button>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 pt-2">
+                  <button
+                    type="button"
+                    disabled={ollamaActionBusy !== null}
+                    onClick={handleInstallOllama}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 flex items-center gap-1.5"
+                    title="Chạy irm https://ollama.com/install.ps1 | iex để cài Ollama tự động"
+                  >
+                    {ollamaActionBusy === 'install' ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" />
+                    ) : (
+                      <Cpu className="w-3.5 h-3.5 text-blue-500" />
+                    )}
+                    <span>
+                      {ollamaActionBusy === 'install' ? 'Đang cài Ollama...' : 'Cài đặt Ollama tự động'}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={ollamaActionBusy !== null}
+                    onClick={handlePullOllamaModel}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium border border-indigo-300 dark:border-indigo-800 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/70 dark:hover:bg-indigo-900 text-indigo-700 dark:text-indigo-300 flex items-center gap-1.5"
+                    title={`Tải model ${effectiveModel} về máy`}
+                  >
+                    {ollamaActionBusy === 'pull' ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-3.5 h-3.5" />
+                    )}
+                    <span>
+                      {ollamaActionBusy === 'pull'
+                        ? `Đang tải ${effectiveModel}...`
+                        : `Tải Model (${effectiveModel})`}
+                    </span>
                   </button>
                 </div>
               </div>

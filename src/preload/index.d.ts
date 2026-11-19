@@ -48,6 +48,8 @@ export interface ScreenshotAPI {
   createPhysicalFolder: (folderName: string) => Promise<boolean>
   closeQuickPopup: () => Promise<void>
   openMainWindow: () => Promise<void>
+  installOllama: () => Promise<{ success: boolean; message: string }>
+  pullOllamaModel: (model: string) => Promise<{ success: boolean; message: string }>
 }
 
 declare global {
