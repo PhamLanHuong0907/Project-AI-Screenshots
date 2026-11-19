@@ -54,6 +54,7 @@ export const Settings: React.FC<SettingsProps> = ({
   const [claudeKeyInput, setClaudeKeyInput] = useState('')
 
   const [autoApplyRename, setAutoApplyRename] = useState(false)
+  const [manualRenameOnly, setManualRenameOnly] = useState(false)
   const [organizeMode, setOrganizeMode] = useState<OrganizeMode>('rename_in_place')
   const [deleteSourceOnConfirm, setDeleteSourceOnConfirm] = useState(true)
   const [useDefaultCategories, setUseDefaultCategories] = useState(true)
@@ -84,6 +85,7 @@ export const Settings: React.FC<SettingsProps> = ({
     setOllamaBaseUrl(settings.ollamaBaseUrl || 'http://127.0.0.1:11434')
     setUseClaudeCodeCli(settings.useClaudeCodeCli)
     setAutoApplyRename(settings.autoApplyRename)
+    setManualRenameOnly(Boolean(settings.manualRenameOnly))
     setOrganizeMode(settings.organizeMode || 'rename_in_place')
     setDeleteSourceOnConfirm(settings.deleteSourceOnConfirm !== false)
     setUseDefaultCategories(settings.useDefaultCategories !== false)
@@ -161,6 +163,7 @@ export const Settings: React.FC<SettingsProps> = ({
         ollamaBaseUrl: ollamaBaseUrl.trim() || undefined,
         useClaudeCodeCli,
         autoApplyRename,
+        manualRenameOnly,
         organizeMode,
         deleteSourceOnConfirm,
         useDefaultCategories,
@@ -275,48 +278,47 @@ export const Settings: React.FC<SettingsProps> = ({
     subtitle: string
     badge: string
   }> = [
-    {
-      id: 'ollama',
-      title: 'Ollama (Local AI)',
-      subtitle: 'Moondream, MiniCPM-V, Llama 3.2 Vision',
-      badge: 'Local Vision'
-    },
-    {
-      id: 'tesseract',
-      title: 'Tesseract OCR (Local)',
-      subtitle: '100% Offline trên máy — Không cần API Key',
-      badge: 'Free / Offline'
-    },
-    {
-      id: 'gemini',
-      title: 'Google Gemini',
-      subtitle: 'Gemini 2.5 Flash & 2.5 Pro Vision',
-      badge: settings?.providerKeys?.gemini?.hasKey ? 'Key Saved' : 'API Key'
-    },
-    {
-      id: 'claude',
-      title: 'Claude / Claude Code',
-      subtitle: 'Local claude.exe CLI or Anthropic API',
-      badge: settings?.claudeCliAvailable ? 'CLI Detected' : 'API Key'
-    },
-    {
-      id: 'openai',
-      title: 'OpenAI Vision',
-      subtitle: 'GPT-4o Mini, GPT-4o & GPT-4.1',
-      badge: settings?.providerKeys?.openai?.hasKey ? 'Key Saved' : 'API Key'
-    }
-  ]
+      {
+        id: 'ollama',
+        title: 'Ollama (Local AI)',
+        subtitle: 'Moondream, MiniCPM-V, Llama 3.2 Vision',
+        badge: 'Local Vision'
+      },
+      {
+        id: 'tesseract',
+        title: 'Tesseract OCR (Local)',
+        subtitle: '100% Offline trên máy — Không cần API Key',
+        badge: 'Free / Offline'
+      },
+      {
+        id: 'gemini',
+        title: 'Google Gemini',
+        subtitle: 'Gemini 2.5 Flash & 2.5 Pro Vision',
+        badge: settings?.providerKeys?.gemini?.hasKey ? 'Key Saved' : 'API Key'
+      },
+      {
+        id: 'claude',
+        title: 'Claude / Claude Code',
+        subtitle: 'Local claude.exe CLI or Anthropic API',
+        badge: settings?.claudeCliAvailable ? 'CLI Detected' : 'API Key'
+      },
+      {
+        id: 'openai',
+        title: 'OpenAI Vision',
+        subtitle: 'GPT-4o Mini, GPT-4o & GPT-4.1',
+        badge: settings?.providerKeys?.openai?.hasKey ? 'Key Saved' : 'API Key'
+      }
+    ]
 
   return (
     <div className="h-full overflow-y-auto p-6">
       <form onSubmit={handleSave} className="max-w-4xl mx-auto space-y-6 pb-8">
         {saveBanner && (
           <div
-            className={`p-4 rounded-xl border text-xs font-medium flex items-center gap-2 ${
-              saveBanner.type === 'success'
+            className={`p-4 rounded-xl border text-xs font-medium flex items-center gap-2 ${saveBanner.type === 'success'
                 ? 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/60 dark:border-emerald-800 dark:text-emerald-200'
                 : 'bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-950/60 dark:border-rose-800 dark:text-rose-200'
-            }`}
+              }`}
           >
             {saveBanner.type === 'success' ? (
               <CheckCircle2 className="w-4 h-4 shrink-0" />
@@ -376,22 +378,20 @@ export const Settings: React.FC<SettingsProps> = ({
                   key={tab.id}
                   type="button"
                   onClick={() => handleSelectProvider(tab.id)}
-                  className={`text-left p-3.5 rounded-xl border transition-all ${
-                    selected
+                  className={`text-left p-3.5 rounded-xl border transition-all ${selected
                       ? 'border-indigo-500 bg-indigo-50/60 dark:bg-indigo-950/50 ring-2 ring-indigo-500/20'
                       : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-slate-50/40 dark:bg-slate-950/40'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-bold text-slate-900 dark:text-white">
                       {tab.title}
                     </span>
                     <span
-                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                        selected
+                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${selected
                           ? 'bg-indigo-600 text-white'
                           : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-                      }`}
+                        }`}
                     >
                       {tab.badge}
                     </span>
@@ -636,11 +636,10 @@ export const Settings: React.FC<SettingsProps> = ({
 
           {validationResult && (
             <div
-              className={`mt-2 p-2.5 rounded-lg border text-xs flex items-center gap-2 ${
-                validationResult.valid
+              className={`mt-2 p-2.5 rounded-lg border text-xs flex items-center gap-2 ${validationResult.valid
                   ? 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/50 dark:border-emerald-800 dark:text-emerald-200'
                   : 'bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-950/50 dark:border-rose-800 dark:text-rose-200'
-              }`}
+                }`}
             >
               {validationResult.valid ? (
                 <CheckCircle2 className="w-4 h-4 shrink-0" />
@@ -669,22 +668,37 @@ export const Settings: React.FC<SettingsProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50">
               <label className="block text-xs font-semibold text-slate-800 dark:text-slate-200 mb-1.5">
-                When a Screenshot is Analyzed
+                When a Screenshot is Captured
               </label>
               <select
-                value={autoApplyRename ? 'auto' : 'review'}
-                onChange={(e) => setAutoApplyRename(e.target.value === 'auto')}
+                value={manualRenameOnly ? 'manual' : autoApplyRename ? 'auto' : 'review'}
+                onChange={(e) => {
+                  const v = e.target.value
+                  if (v === 'manual') {
+                    setManualRenameOnly(true)
+                    setAutoApplyRename(false)
+                  } else if (v === 'auto') {
+                    setManualRenameOnly(false)
+                    setAutoApplyRename(true)
+                  } else {
+                    setManualRenameOnly(false)
+                    setAutoApplyRename(false)
+                  }
+                }}
                 className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-slate-100"
               >
                 <option value="review">
-                  Review Before Save (Confirm in Review Queue first)
+                  Review Before Save (AI gợi ý tên → Kiểm tra &amp; xác nhận)
                 </option>
                 <option value="auto">
-                  Auto-Rename Immediately (Rename file automatically right after AI analysis)
+                  Auto-Rename Immediately (AI tự động đổi tên ngay)
+                </option>
+                <option value="manual">
+                  Tự đặt tên thủ công (Không dùng AI — Hiện ảnh để tự nhập tên &amp; chọn thư mục)
                 </option>
               </select>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5">
-                Turn on Auto-Rename if you want screenshots renamed on disk immediately after taking them.
+                Chọn &ldquo;Tự đặt tên thủ công&rdquo; nếu bạn muốn bỏ qua AI, hiện ảnh ngay lập tức để tự gõ tên và chọn thư mục lưu.
               </p>
             </div>
 

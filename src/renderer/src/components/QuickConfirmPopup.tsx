@@ -129,9 +129,9 @@ export const QuickConfirmPopup: React.FC = () => {
         const cleanCustom = customFolderInput.trim().replace(/\\/g, '/').replace(/\/+/g, '/').replace(/^\/|\/$/g, '')
         if (cleanCustom) {
           finalCategory = cleanCustom
-          void window.screenshotAPI.addCategory(cleanCustom).catch(() => {})
+          void window.screenshotAPI.addCategory(cleanCustom).catch(() => { })
           if (window.screenshotAPI?.createPhysicalFolder) {
-            void window.screenshotAPI.createPhysicalFolder(cleanCustom).catch(() => {})
+            void window.screenshotAPI.createPhysicalFolder(cleanCustom).catch(() => { })
           }
         }
       }
@@ -355,7 +355,9 @@ export const QuickConfirmPopup: React.FC = () => {
                     {category}
                   </span>
                   <span className="text-[11px] font-medium text-emerald-400 shrink-0">
-                    Độ tin cậy: {formatConfidence(item.confidence)}
+                    {item.tags?.includes('Manual')
+                      ? 'Thủ công (Không AI)'
+                      : `Độ tin cậy: ${formatConfidence(item.confidence)}`}
                   </span>
                 </div>
                 <p className="text-xs text-slate-300 line-clamp-2 mt-1">

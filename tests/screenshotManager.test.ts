@@ -625,5 +625,62 @@ describe('AI Screenshot Manager - Critical Test Suite', () => {
       expect(fs.existsSync(srcFile2)).toBe(true)
       expect(fs.existsSync(saved2.final_path)).toBe(true)
     })
+
+    it('supports manualRenameOnly mode without calling AI service', async () => {
+      const sourceDir = path.join(tempDir, 'ManualScreenshots')
+      const destDir = path.join(tempDir, 'ManualDest')
+      const configDir = path.join(tempDir, 'config-manual')
+      fs.mkdirSync(sourceDir, { recursive: true })
+      fs.mkdirSync(path.join(destDir, 'Tuần 1'), { recursive: true })
+
+      const settingsService = new SettingsService(configDir)
+      settingsService.updateSettings({
+        sourceFolder: sourceDir,
+        destinationFolder: destDir,
+        manualRenameOnly: true,
+        useDefaultCategories: false
+      })
+
+      const mockMetadataService = {
+        extractMetadata: vi.fn().mockImplementation(async (filePath: string) => ({
+          originalName: path.basename(filePath),
+          originalPath: filePath,
+          fileHash: await computeFileSha256(filePath),
+          width: 1280,
+          height: 720,
+          format: 'png',
+          sizeBytes: SAMPLE_PNG_BUFFER.length,
+          mimeType: 'image/png'
+        }))
+      }
+
+      const mockAiService = {
+        analyzeScreenshot: vi.fn()
+      }
+
+      const fileOrganizer = new FileOrganizer(repository, settingsService)
+      const watcher = new ScreenshotWatcher(
+        repository,
+        settingsService,
+        mockMetadataService as never,
+        mockAiService as never,
+        fileOrganizer
+      )
+
+      const rawPath = path.join(sourceDir, 'Screenshot_Manual_Test.png')
+      fs.writeFileSync(rawPath, SAMPLE_PNG_BUFFER)
+
+      const created = await watcher.handleNewFileDetected(rawPath)
+      expect(created).not.toBeNull()
+
+      await new Promise((r) => setTimeout(r, 80))
+
+      expect(mockAiService.analyzeScreenshot).not.toHaveBeenCalled()
+      const reviewed = repository.findById(created!.id)!
+      expect(reviewed.status).toBe('review')
+      expect(reviewed.suggested_name).toBe('Screenshot_Manual_Test')
+      expect(reviewed.category).toBe('Tuần 1')
+      expect(reviewed.tags).toContain('Manual')
+    })
   })
 })

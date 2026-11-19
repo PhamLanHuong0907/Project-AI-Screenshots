@@ -21,6 +21,7 @@ interface StoredSettingsData {
   useDefaultCategories?: boolean
   useClaudeCodeCli: boolean
   autoApplyRename: boolean
+  manualRenameOnly?: boolean
   organizeMode: OrganizeMode
   deleteSourceOnConfirm?: boolean
   watchClipboard: boolean
@@ -108,6 +109,7 @@ export class SettingsService {
       useDefaultCategories: true,
       useClaudeCodeCli: true,
       autoApplyRename: false,
+      manualRenameOnly: false,
       organizeMode: 'rename_in_place',
       deleteSourceOnConfirm: true,
       watchClipboard: true,
@@ -206,6 +208,7 @@ export class SettingsService {
       claudeCliAvailable: Boolean(this.detectedClaudeCliPath),
       claudeCliPath: this.detectedClaudeCliPath,
       autoApplyRename: Boolean(this.data.autoApplyRename),
+      manualRenameOnly: Boolean(this.data.manualRenameOnly),
       organizeMode: this.data.organizeMode || 'rename_in_place',
       deleteSourceOnConfirm: this.data.deleteSourceOnConfirm !== false,
       watchClipboard: Boolean(this.data.watchClipboard),
@@ -346,6 +349,9 @@ export class SettingsService {
     }
     if (payload.autoApplyRename !== undefined) {
       this.data.autoApplyRename = Boolean(payload.autoApplyRename)
+    }
+    if (payload.manualRenameOnly !== undefined) {
+      this.data.manualRenameOnly = Boolean(payload.manualRenameOnly)
     }
     if (payload.organizeMode !== undefined) {
       this.data.organizeMode = payload.organizeMode

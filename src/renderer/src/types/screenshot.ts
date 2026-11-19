@@ -213,6 +213,7 @@ export interface AppSettings {
   claudeCliAvailable: boolean
   claudeCliPath: string
   autoApplyRename: boolean
+  manualRenameOnly: boolean
   organizeMode: OrganizeMode
   deleteSourceOnConfirm: boolean
   watchClipboard: boolean
@@ -238,6 +239,7 @@ export interface UpdateSettingsPayload {
   useDefaultCategories?: boolean
   useClaudeCodeCli?: boolean
   autoApplyRename?: boolean
+  manualRenameOnly?: boolean
   organizeMode?: OrganizeMode
   deleteSourceOnConfirm?: boolean
   watchClipboard?: boolean

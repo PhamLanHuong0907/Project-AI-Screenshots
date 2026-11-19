@@ -504,6 +504,44 @@ export class ScreenshotWatcher extends EventEmitter {
       }
     }
 
+    const currentSettingsForMode = this.settingsService.getPublicSettings()
+    if (currentSettingsForMode.manualRenameOnly && !forceAI) {
+      let defaultCat = 'Others'
+      const destDir = currentSettingsForMode.destinationFolder
+      if (currentSettingsForMode.useDefaultCategories === false && destDir && fs.existsSync(destDir)) {
+        try {
+          const dirs = fs
+            .readdirSync(destDir, { withFileTypes: true })
+            .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
+            .map((e) => e.name)
+          if (dirs.length > 0) {
+            const hasOthers = dirs.find((d) => /^(others|khac|khác|chung)$/i.test(d))
+            defaultCat = hasOthers || dirs[0]
+          }
+        } catch {
+          // Ignore
+        }
+      }
+
+      const baseOriginalName = path.basename(activePath, path.extname(activePath))
+      const manualReady = this.repository.update(screenshotId, {
+        suggested_name: baseOriginalName,
+        category: defaultCat,
+        description: 'Chế độ tự đặt tên thủ công (không dùng AI).',
+        tags: ['Manual'],
+        confidence: 1,
+        status: 'review',
+        error_message: ''
+      })
+      this.repository.logHistory(
+        screenshotId,
+        'manual_review_ready',
+        `Ready for manual naming (${defaultCat})`
+      )
+      this.emit('screenshot-updated', manualReady)
+      return manualReady
+    }
+
     const analyzingRecord = this.repository.update(screenshotId, {
       status: 'analyzing',
       error_message: ''

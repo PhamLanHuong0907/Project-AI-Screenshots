@@ -118,6 +118,7 @@ export const UpdateSettingsSchema = z.object({
   useDefaultCategories: z.boolean().optional(),
   useClaudeCodeCli: z.boolean().optional(),
   autoApplyRename: z.boolean().optional(),
+  manualRenameOnly: z.boolean().optional(),
   organizeMode: z.enum(['category_folders', 'rename_in_place']).optional(),
   deleteSourceOnConfirm: z.boolean().optional(),
   watchClipboard: z.boolean().optional(),
